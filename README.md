@@ -1,25 +1,28 @@
 # lex-cognitive-weathering
 
-LEX extension for LegionIO that models long-term cognitive wear from sustained workloads. Based on allostatic load theory: agents can be worn down by constant demands but also tempered (strengthened) by manageable challenges.
+A LegionIO cognitive architecture extension that models long-term cumulative cognitive wear. Based on allostatic load theory: sustained demands erode integrity, but manageable challenges also build tempering — a resilience multiplier that allows tempered agents to exceed their baseline capacity.
 
-## Concept
+## What It Does
 
-Unlike acute fatigue (which recovers quickly), weathering represents cumulative stress that permanently reduces capacity unless actively restored. Manageable stressors build resilience (tempering). Overwhelming stressors erode integrity.
+Tracks cognitive **integrity** (0.0–1.0) and **tempering level** (0.0–1.0) through stressor events and recovery.
 
-## Installation
+Each stressor has:
+- A type (`:cognitive_overload`, `:emotional_strain`, `:decision_fatigue`, `:conflict_exposure`, `:uncertainty`, `:time_pressure`, `:monotony`, `:complexity`)
+- Intensity (0.0–1.0) and duration (seconds)
+- `cumulative_impact` = `intensity * (duration / 3600.0)`
 
-Add to your Gemfile:
+Stressors with intensity <= 0.4 are **manageable** — they wear down integrity *and* build tempering. Overwhelming stressors (intensity >= 0.8) erode without building resilience.
 
-```ruby
-gem 'lex-cognitive-weathering'
-```
+**Effective capacity** = `integrity * (1 + tempering * 0.2)` — a tempered agent can exceed 1.0 base capacity (up to 1.2).
 
 ## Usage
 
 ```ruby
+require 'lex-cognitive-weathering'
+
 client = Legion::Extensions::CognitiveWeathering::Client.new
 
-# Apply a stressor
+# Apply an overwhelming stressor (erodes integrity, no tempering)
 client.apply_stressor(
   description:   'Sprint deadline pressure',
   stressor_type: :time_pressure,
@@ -27,52 +30,43 @@ client.apply_stressor(
   duration:      7200,
   domain:        'engineering'
 )
+# => { integrity: 0.9984, tempering_level: 0.0, effective_capacity: 0.9984, fragile: false, ... }
 
-# Apply a manageable challenge (builds tempering)
+# Apply a manageable stressor (erodes slightly, builds tempering)
 client.apply_stressor(
   description:   'Steady background complexity',
   stressor_type: :complexity,
   intensity:     0.3,
   duration:      3600
 )
+# => { integrity: 0.9980, tempering_level: 0.0009, effective_capacity: 0.9982, ... }
 
 # Check current state
-status = client.integrity_status
-# => { integrity: 0.98, integrity_label: "pristine", tempering_level: 0.001, ... }
+client.integrity_status
+# => { integrity: 0.9980, integrity_label: "pristine", tempering_level: 0.0009, weathering_label: "eroded", ... }
 
-# Recover from wear
+# Recover from wear (small increment)
 client.recover(amount: 1.0)
+# => { integrity: 0.9990, ... }
 
 # Full rest (5x recovery rate)
 client.rest(amount: 1.0)
+# => { integrity: 0.9995, ... }
 
-# Full report
+# Full weathering report
 client.weathering_report
+# => { integrity: 0.9995, integrity_label: "pristine", tempering_level: 0.0009, weathering_label: "eroded",
+#      effective_capacity: 0.9997, total_wear: 0.0021, total_recovery: 0.0015,
+#      stressor_count: 2, fragile: false, breaking: false, recent_stressors: [...] }
 ```
 
-## Stressor Types
+## Development
 
-`:cognitive_overload`, `:emotional_strain`, `:decision_fatigue`, `:conflict_exposure`, `:uncertainty`, `:time_pressure`, `:monotony`, `:complexity`
-
-## Integrity Labels
-
-| Range     | Label    |
-|-----------|----------|
-| 0.8–1.0   | pristine |
-| 0.6–0.8   | strong   |
-| 0.4–0.6   | worn     |
-| 0.2–0.4   | fragile  |
-| 0.0–0.2   | breaking |
-
-## Weathering Labels (Tempering Level)
-
-| Range     | Label     |
-|-----------|-----------|
-| 0.7–1.0   | tempered  |
-| 0.5–0.7   | resilient |
-| 0.3–0.5   | stable    |
-| 0.1–0.3   | weathered |
-| 0.0–0.1   | eroded    |
+```bash
+bundle install
+bundle exec rspec
+bundle exec rubocop
+```
 
 ## License
 
